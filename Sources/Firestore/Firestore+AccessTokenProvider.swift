@@ -10,7 +10,8 @@ import FirestoreAPI
 import AsyncHTTPClient
 import NIO
 import NIOFoundationCompat
-import JWTKit
+@preconcurrency import JWTKit
+import Synchronization
 
 struct AccessTokenPayload: JWTPayload {
     var iss: IssuerClaim
@@ -33,17 +34,21 @@ public protocol AccessScope {
     var value: String { get }
 }
 
-public class AccessTokenProvider: FirestoreAPI.AccessTokenProvider {
+public final class AccessTokenProvider: FirestoreAPI.AccessTokenProvider, Sendable {
 
     private let serviceAccount: ServiceAccount
-
     private let signer: JWTSigner
 
-    public var scope: FirestoreAPI.AccessScope { Firestore.Scope() }
+    public var scope: any FirestoreAPI.AccessScope { Firestore<HTTP2ClientTransport.Posix>.Scope() }
 
-    var accessToken: String?
+    // Mutexで保護されたトークンキャッシュ
+    private let cache = Mutex<TokenCache>(TokenCache())
 
-    var expireTime: Date?
+    // トークンキャッシュ構造体
+    struct TokenCache: Sendable {
+        var accessToken: String?
+        var expireTime: Date?
+    }
 
     public init(serviceAccount: ServiceAccount) throws {
         self.serviceAccount = serviceAccount
@@ -54,19 +59,31 @@ public class AccessTokenProvider: FirestoreAPI.AccessTokenProvider {
     /**
      Retrieves an access token for the Firestore database.
 
-     Use this method to retrieve an access token for the Firestore database. If an access token has already been retrieved, this method returns it. Otherwise, it initializes an `AccessTokenProvider` instance with the `FirebaseApp` service account and retrieves a new access token using the `Scope` struct. The access token is then stored in the `accessToken` property of the `Firestore` instance and returned.
+     Use this method to retrieve an access token for the Firestore database. If an access token has already been retrieved, this method returns it. Otherwise, it initializes an `AccessTokenProvider` instance with the `FirebaseApp` service account and retrieves a new access token using the `Scope` struct. The access token is then stored in the cache and returned.
 
      - Returns: An access token for the Firestore database.
      - Throws: A `ServiceAccountError` if an error occurs while initializing the `AccessTokenProvider` instance or retrieving the access token.
      */
     public func getAccessToken(expirationDuration: TimeInterval) async throws -> String {
-        if let token = accessToken, let expiration = expireTime, expiration > Date() {
+        // キャッシュの確認（アトミック）
+        let cachedData = cache.withLock { $0 }
+
+        if let token = cachedData.accessToken,
+           let expiration = cachedData.expireTime,
+           expiration > Date() {
             return token
         }
-        let accessToken = try await fetchAccessToken(scope, expirationDuration: expirationDuration)
-        self.accessToken = accessToken
-        self.expireTime = Date(timeIntervalSinceNow: expirationDuration)
-        return accessToken
+
+        // 新しいトークンを取得
+        let newToken = try await fetchAccessToken(scope, expirationDuration: expirationDuration)
+
+        // キャッシュを更新（アトミック）
+        cache.withLock { cache in
+            cache.accessToken = newToken
+            cache.expireTime = Date(timeIntervalSinceNow: expirationDuration)
+        }
+
+        return newToken
     }
 
     private func fetchAccessToken(_ scope: FirestoreAPI.AccessScope, expirationDuration: TimeInterval) async throws -> String {
@@ -88,7 +105,8 @@ public class AccessTokenProvider: FirestoreAPI.AccessTokenProvider {
         let url = URL(string: "https://\(GOOGLE_AUTH_TOKEN_HOST)\(GOOGLE_AUTH_TOKEN_PATH)")!
         var configuration = HTTPClient.Configuration()
         configuration.tlsConfiguration = .clientDefault
-        configuration.tlsConfiguration?.certificateVerification = .none
+        // Use full certificate verification for security
+        configuration.tlsConfiguration?.certificateVerification = .fullVerification
         configuration.httpVersion = .automatic
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let client = HTTPClient(eventLoopGroupProvider: .shared(eventLoopGroup))

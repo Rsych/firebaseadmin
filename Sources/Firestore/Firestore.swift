@@ -1,13 +1,19 @@
 import Foundation
 @_exported import FirestoreAPI
 @_exported import FirebaseApp
+@_exported import GRPCNIOTransportHTTP2
 
 /**
- A class that represents a Firestore database instance.
- 
- The `Firestore` class provides methods for accessing collections and documents within a Firestore database.
+ A typealias for Firestore with HTTP2 transport using NIO.
+
+ This is the default transport implementation for Firestore.
  */
-extension Firestore {
+public typealias FirestoreHTTP2 = Firestore<HTTP2ClientTransport.Posix>
+
+/**
+ Extension providing convenience methods for creating Firestore instances.
+ */
+extension Firestore where Transport == HTTP2ClientTransport.Posix {
 
     /**
      A struct that represents an access scope for the Firestore database.
@@ -22,24 +28,33 @@ extension Firestore {
 
     /**
      Returns a `Firestore` instance initialized with the default `FirebaseApp` instance.
-     
+
      - Parameter app: The `FirebaseApp` instance to use for authenticating with the Firestore database.
-     
+
      Use this method to obtain a `Firestore` instance that is initialized with the default `FirebaseApp` instance. This is useful if your app uses only one Firebase project and you need to access only one Firestore database.
-     
+
      - Returns: A `Firestore` instance initialized with the default `FirebaseApp` instance.
      */
-    public static func firestore(app: FirebaseApp = FirebaseApp.app) throws -> Firestore {
+    public static func firestore(app: FirebaseApp = FirebaseApp.app) throws -> Firestore<HTTP2ClientTransport.Posix> {
         guard let serviceAccount = app.serviceAccount else {
             throw NSError(domain: "ServiceAccountError", code: 500, userInfo: [NSLocalizedDescriptionKey: "Service Account is not initialized"])
         }
-        let firestore = Firestore(projectId: serviceAccount.projectId)
-        do {
-            firestore.accessTokenProvider = try AccessTokenProvider(serviceAccount: serviceAccount)
-            return firestore
-        } catch {
-            fatalError("Invalid Service Account.")
-        }
+
+        let transport = try HTTP2ClientTransport.Posix(
+            target: .dns(host: "firestore.googleapis.com"),
+            transportSecurity: .tls,
+            config: .defaults(configure: { $0.http2.targetWindowSize = 65535 })
+        )
+
+        let accessTokenProvider = try AccessTokenProvider(serviceAccount: serviceAccount)
+
+        let firestore = Firestore(
+            projectId: serviceAccount.projectId,
+            transport: transport,
+            accessTokenProvider: accessTokenProvider
+        )
+
+        return firestore
     }
 
     /**

@@ -8,5 +8,15 @@ DerivedData/
 .swiftpm/config/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
-Tests/FirestoreTests/ServiceAccount.json
 Package.resolved
+
+# Firebase Service Account (DO NOT COMMIT)
+ServiceAccount.json
+**/ServiceAccount.json
+firebase-adminsdk-*.json
+config/firebase.json
+
+# Environment files
+.env
+.env.local
+.env.*.local

@@ -1,12 +1,8 @@
-import XCTest
+import Testing
 @testable import Firestore
 
-final class RangeQueryTests: XCTestCase {
-
-    override class func setUp() {
-        let serviceAccount = try! loadServiceAccount(from: "ServiceAccount")
-        FirebaseApp.initialize(serviceAccount: serviceAccount)
-    }
+@Suite("Range Query Tests", .disabled("Requires actual Firebase credentials"))
+struct RangeQueryTests {
 
     let path = "test/range/items"
 
@@ -15,9 +11,13 @@ final class RangeQueryTests: XCTestCase {
         var endTime: Timestamp
     }
 
-    override func setUp() async throws {
-        let ref = Firestore.firestore().collection(path)
-        let batch = Firestore.firestore().batch()
+    init() throws {
+        try initializeFirebaseForTesting()
+    }
+
+    private func setupTestData() async throws {
+        let ref = try Firestore.firestore().collection(path)
+        let batch = try Firestore.firestore().batch()
         let item0 = CalendarItem(
             startTime: .init(year: 2023, month: 4, day: 12),
             endTime: .init(year: 2023, month: 4, day: 14)
@@ -44,11 +44,10 @@ final class RangeQueryTests: XCTestCase {
         try batch.setData(from: item3, forDocument: ref.document("3"))
         try batch.setData(from: item4, forDocument: ref.document("4"))
         try await batch.commit()
-
     }
 
-    override func tearDown() async throws {
-        let firestore = Firestore.firestore()
+    private func cleanupTestData() async throws {
+        let firestore = try Firestore.firestore()
         let collection = firestore.collection(path)
         let snapshot = try await collection.getDocuments()
         for document in snapshot.documents {
@@ -56,102 +55,115 @@ final class RangeQueryTests: XCTestCase {
         }
     }
 
-    class func loadServiceAccount(from jsonFile: String) throws -> ServiceAccount {
-        guard let path = Bundle.module.path(forResource: jsonFile, ofType: "json")  else {
-            throw NSError(domain: "FileNotFoundError", code: 404, userInfo: [NSLocalizedDescriptionKey: "JSON file not found"])
-        }
-        do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
-            let decoder = JSONDecoder()
-            let serviceAccount = try decoder.decode(ServiceAccount.self, from: data)
-            return serviceAccount
-        } catch {
-            throw NSError(domain: "JSONParsingError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Error parsing JSON file: \(error)"])
-        }
-    }
+    @Test func whereQueryIsEqualTo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
 
-    func testWhereQueryIsEqualTo() async throws {
-        let ref = Firestore.firestore().collection(path)
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isEqualTo: Timestamp(year: 2023, month: 4, day: 12))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 1)
+            #expect(snapshot.documents.count == 1)
         }
     }
 
-    func testWhereQueryIsNotEqualTo() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIsNotEqualTo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isNotEqualTo: Timestamp(year: 2023, month: 4, day: 12))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 4)
+            #expect(snapshot.documents.count == 4)
         }
     }
 
-    func testWhereQueryIsLessThan() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIsLessThan() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isLessThan: Timestamp(year: 2023, month: 4, day: 14))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 2)
+            #expect(snapshot.documents.count == 2)
         }
     }
 
-    func testWhereQueryIsLessThanOrEqualTo() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIsLessThanOrEqualTo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isLessThanOrEqualTo: Timestamp(year: 2023, month: 4, day: 14))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 3)
+            #expect(snapshot.documents.count == 3)
         }
     }
 
-    func testWhereQueryIsGreaterThan() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIsGreaterThan() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isGreaterThan: Timestamp(year: 2023, month: 4, day: 13))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 3)
+            #expect(snapshot.documents.count == 3)
         }
     }
 
-    func testWhereQueryIsGreaterThanOrEqualTo() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIsGreaterThanOrEqualTo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", isGreaterThanOrEqualTo: Timestamp(year: 2023, month: 4, day: 13))
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 4)
+            #expect(snapshot.documents.count == 4)
         }
     }
 
-    func testWhereQueryIn() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryIn() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", in: [Timestamp(year: 2023, month: 4, day: 12), Timestamp(year: 2023, month: 4, day: 13)])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 2)
+            #expect(snapshot.documents.count == 2)
         }
     }
 
-    func testWhereQueryNotIn() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryNotIn() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .where(field: "startTime", notIn: [Timestamp(year: 2023, month: 4, day: 12), Timestamp(year: 2023, month: 4, day: 13)])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 3)
+            #expect(snapshot.documents.count == 3)
         }
     }
 
-    func testWhereQueryAndGreaterThanOrEqualToLessThan() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryAndGreaterThanOrEqualToLessThan() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .and([
@@ -159,12 +171,15 @@ final class RangeQueryTests: XCTestCase {
                     ("startTime" < Timestamp(year: 2023, month: 4, day: 14))
                 ])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 2)
+            #expect(snapshot.documents.count == 2)
         }
     }
 
-    func testWhereQueryAndGreaterThanOrEqualToLessThanOrEqualTo() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryAndGreaterThanOrEqualToLessThanOrEqualTo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .and([
@@ -172,12 +187,15 @@ final class RangeQueryTests: XCTestCase {
                     ("startTime" <= Timestamp(year: 2023, month: 4, day: 14))
                 ])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 3)
+            #expect(snapshot.documents.count == 3)
         }
     }
 
-    func testWhereQueryOrAndGreaterThanOrEqualToLessThan() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryOrAndGreaterThanOrEqualToLessThan() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .or([
@@ -191,12 +209,15 @@ final class RangeQueryTests: XCTestCase {
                     ])
                 ])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 2)
+            #expect(snapshot.documents.count == 2)
         }
     }
 
-    func testWhereQueryOrAndGreaterThanOrEqualToLessThanOrEqualToo() async throws {
-        let ref = Firestore.firestore().collection(path)
+    @Test func whereQueryOrAndGreaterThanOrEqualToLessThanOrEqualToo() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
         do {
             let snapshot = try await ref
                 .or([
@@ -210,7 +231,7 @@ final class RangeQueryTests: XCTestCase {
                     ])
                 ])
                 .getDocuments()
-            XCTAssertEqual(snapshot.documents.count, 4)
+            #expect(snapshot.documents.count == 4)
         }
     }
 }

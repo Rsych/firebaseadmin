@@ -9,18 +9,18 @@ import Foundation
 import AnyCodable
 import JWTKit
 
-public struct UserList: Codable {
+public struct UserList: Codable, Sendable {
     public let userInfo: [UserRecord]
 }
 
-public struct UserRecord: Codable {
+public struct UserRecord: Codable, Sendable {
     public let localID: String
     public let email, displayName: String?
     public let photoURL: String?
     public let emailVerified: Bool?
     public let providerUserInfo: [ProviderUserInfo]?
     public let validSince, lastLoginAt, createdAt, lastRefreshAt: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case localID = "localId"
         case email, displayName
@@ -105,11 +105,11 @@ struct UserRequest: Codable {
     let localId: String
 }
 
-public struct LookupResponse: Codable {
+public struct LookupResponse: Codable, Sendable {
     public let users: [FirebaseUser]?
 }
 
-public struct FirebaseUser: Codable {
+public struct FirebaseUser: Codable, Sendable {
     public let localId: String
     public let email: String?
     public let emailVerified: Bool?
@@ -128,7 +128,7 @@ public struct FirebaseUser: Codable {
     public let tenantId: String?
 }
 
-public struct ProviderUserInfo: Codable {
+public struct ProviderUserInfo: Codable, Sendable {
     public let providerId: String?
     public let federatedId: String?
     public let email: String?

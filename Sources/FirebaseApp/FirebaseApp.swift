@@ -64,4 +64,51 @@ public final class FirebaseApp: @unchecked Sendable {
         }
         return serviceAccount
     }
+
+    // MARK: - Environment Variable Initialization
+
+    /// Initialize from environment variables
+    ///
+    /// Reads Firebase service account configuration from environment variables:
+    /// - `FIREBASE_PROJECT_ID`
+    /// - `FIREBASE_PRIVATE_KEY_ID`
+    /// - `FIREBASE_PRIVATE_KEY`
+    /// - `FIREBASE_CLIENT_EMAIL`
+    /// - `FIREBASE_CLIENT_ID`
+    ///
+    /// Example:
+    /// ```bash
+    /// export FIREBASE_PROJECT_ID="my-project"
+    /// export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+    /// export FIREBASE_CLIENT_EMAIL="firebase-adminsdk@my-project.iam.gserviceaccount.com"
+    /// export FIREBASE_CLIENT_ID="123456789"
+    /// export FIREBASE_PRIVATE_KEY_ID="key-id"
+    /// ```
+    ///
+    /// ```swift
+    /// try FirebaseApp.initializeFromEnvironment()
+    /// ```
+    public static func initializeFromEnvironment() throws {
+        let serviceAccount = try ServiceAccount.loadFromEnvironment()
+        initialize(serviceAccount: serviceAccount)
+    }
+
+    /// Initialize with hierarchical configuration (async)
+    ///
+    /// Priority order:
+    /// 1. Environment variables (highest)
+    /// 2. JSON file (if provided)
+    ///
+    /// Example:
+    /// ```swift
+    /// // Environment variables only
+    /// try await FirebaseApp.initializeFromConfiguration()
+    ///
+    /// // With JSON file fallback
+    /// try await FirebaseApp.initializeFromConfiguration(jsonPath: "config/firebase.json")
+    /// ```
+    public static func initializeFromConfiguration(jsonPath: String? = nil) async throws {
+        let serviceAccount = try await ServiceAccount.loadFromConfiguration(jsonPath: jsonPath)
+        initialize(serviceAccount: serviceAccount)
+    }
 }

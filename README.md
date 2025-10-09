@@ -1,154 +1,272 @@
-# Firebase admin for Swift
+# Firebase Admin for Swift
 
-Firebase admin for Swift is a Swift package that provides a simple interface to interact with the Firebase admin SDK.
+Firebase Admin for Swift is a server-side Swift package that provides a simple interface to interact with Firebase services using the Firebase Admin SDK.
 
-This repository includes the [googleapis](https://github.com/googleapis/googleapis) repository as a submodule, which is used to generate the API client code for Firebase.
+This repository uses [FirebaseAPI](https://github.com/1amageek/FirebaseAPI) for gRPC-based Firebase service integration.
 
-See: https://github.com/1amageek/FirebaseAPI
+## Features
 
-# Installation
+- ✅ **Swift 6** compatible with strict concurrency
+- 🔥 **Firestore** - Full CRUD operations, queries, transactions, and batch writes
+- 🔐 **Firebase Auth** - User management and authentication
+- 📨 **Firebase Messaging** - Push notifications via FCM
+- ✅ **AppCheck** - App attestation and verification
+- 🌍 **Built-in types** - `Timestamp`, `GeoPoint`, `DocumentReference` support
+- 📦 **Codable** - Native Swift Codable support with property wrappers
+- 🔑 **Flexible authentication** - JSON file or environment variables
 
-To install Firebase Admin for Swift using the Swift Package Manager:
+## Requirements
 
-```Package.swift
+- Swift 6.2+
+- macOS 15+ / iOS 18+
+- Firebase project with service account credentials
+
+## Installation
+
+### Swift Package Manager
+
+```swift
 dependencies: [
     .package(url: "https://github.com/1amageek/FirebaseAdmin.git", branch: "main")
 ]
 ```
 
-# Usage
+## Configuration
 
-Loading a service account
-Before you can use Firebase Admin for Swift, you need to load a service account. A service account is a JSON file that contains credentials for accessing your Firebase project. You can create a service account by following the instructions in the Firebase documentation.
+Firebase Admin for Swift supports multiple ways to configure your service account credentials:
 
-To load a service account in your Swift code:
+### Option 1: Environment Variables (Recommended for Production)
 
-```main.swift
-func loadServiceAccount(from jsonFile: String) throws -> ServiceAccount {
-    guard let path = Bundle.module.path(forResource: jsonFile, ofType: "json")  else {
-        throw NSError(domain: "FileNotFoundError", code: 404, userInfo: [NSLocalizedDescriptionKey: "JSON file not found"])
-    }
-    do {
-        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
-        let decoder = JSONDecoder()
-        let serviceAccount = try decoder.decode(ServiceAccount.self, from: data)
-        return serviceAccount
-    } catch {
-        throw NSError(domain: "JSONParsingError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Error parsing JSON file: \(error)"])
-    }
-}
+```bash
+export FIREBASE_PROJECT_ID="your-project-id"
+export FIREBASE_PRIVATE_KEY_ID="your-private-key-id"
+export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+export FIREBASE_CLIENT_EMAIL="firebase-adminsdk@your-project.iam.gserviceaccount.com"
+export FIREBASE_CLIENT_ID="123456789012345678901"
+```
 
-let serviceAccount = try! loadServiceAccount(from: "ServiceAccount")
+```swift
+import FirebaseApp
+
+// Initialize from environment variables
+try FirebaseApp.initializeFromEnvironment()
+```
+
+### Option 2: JSON File
+
+```swift
+import FirebaseApp
+
+// Initialize from ServiceAccount.json file
+FirebaseApp.initialize(fileName: "ServiceAccount")
+
+// Or with custom path
+let serviceAccount = try FirebaseApp.loadServiceAccount(from: "CustomServiceAccount")
 FirebaseApp.initialize(serviceAccount: serviceAccount)
 ```
 
-```main.swift
+### Option 3: Hierarchical Configuration (Environment + JSON)
 
-struct Object: Codable, Equatable {
-    var number: Int = 0
-    var string: String = "string"
-    var bool: Bool = true
-    var array: [String] = ["0", "1"]
-    var map: [String: String] = ["value": "value"]
-    var date: Date = Date(timeIntervalSince1970: 0)
-    var timestamp: Timestamp = Timestamp(seconds: 0, nanos: 0)
-    var geoPoint: GeoPoint = GeoPoint(latitude: 0, longitude: 0)
-    var reference: DocumentReference = Firestore.firestore().document("documents/id")
-}
+Environment variables take precedence over JSON file:
 
-let writeData: Object = .init(
-    number: 0,
-    string: "string",
-    bool: true,
-    array: ["0", "1"],
-    map: ["key": "value"],
-    date: Date(timeIntervalSince1970: 0),
-    timestamp: Timestamp(seconds: 0, nanos: 0),
-    geoPoint: GeoPoint(latitude: 0, longitude: 0),
-    reference: Firestore.firestore().document("documents/id")
-)
+```swift
+import FirebaseApp
 
-let ref = Firestore
-    .firestore()
-    .collection("documents")
-    .document("your_id")
-try await ref.setData(writeData)
-let readData = try await ref.getDocument(type: Object.self)
-
+// Environment variables override JSON values
+try await FirebaseApp.initializeFromConfiguration(jsonPath: "config/firebase.json")
 ```
 
-## Built-in Support for Timestamp, GeoPoint, and DocumentReference Types
+## Usage
 
-Firebase Admin for Swift provides built-in support for `Timestamp`, `GeoPoint`, and `DocumentReference` types, making it easy to work with these types in your Swift code.
+### Firestore Operations
 
-- `Timestamp` represents a point in time, with a precision of up to nanoseconds.
-- `GeoPoint` represents a geographical point on the Earth's surface, with latitude and longitude coordinates.
-- `DocumentReference` represents a reference to a document in your Firestore database.
+```swift
+import Firestore
 
-With Firebase Admin for Swift, you can create, read, update, and delete documents in your Firestore database using `DocumentReference` objects. You can also store and retrieve timestamps and geographical coordinates using `Timestamp` and `GeoPoint` objects, respectively. Firebase Admin for Swift automatically converts between these Swift types and the corresponding Firestore types.
-
-For example, you can create a `Timestamp` object with the current time using `Timestamp()`, and you can create a `GeoPoint` object with latitude and longitude coordinates using `GeoPoint(latitude:longitude:)`. You can also create a `DocumentReference` object using the `document(_:)` method of a `CollectionReference` object.
-
-
-Firebase Admin for Swift currently supports read and write operations on documents and collections in your Firestore database. However, it does not yet support transactions, which allow you to execute a sequence of read and write operations as a single, atomic unit of work.
-
-Adding transaction support to Firebase Admin for Swift is on the roadmap, and we plan to add this feature in a future release. With transactions, you'll be able to perform complex read and write operations on your Firestore data with confidence, knowing that the changes will either all succeed or all fail together.
-
-We understand that transactions are an important feature for many developers using Firebase, and we're committed to adding this functionality to Firebase Admin for Swift as soon as possible. 
-
-## Codable Support and Property Wrappers
-
-### Codable
-Firebase Admin for Swift provides several convenient features for working with Firestore data, including support for Codable and property wrappers.
-
-With Firebase Admin for Swift's Codable support, you can easily encode and decode Swift objects to and from Firestore documents. To make a Swift object Codable, simply adopt the Codable protocol and define the properties you want to encode and decode. For example:
-
-```User.swift
-struct User: Codable {
-    var name: String
-    var age: Int
-}
-```
-
-### Property wrappers
-
-Firebase Admin for Swift also supports property wrappers, including @DocumentID and @ExplicitNull. The @DocumentID property wrapper allows you to automatically populate a property with the ID of the document when decoding from Firestore:
-
-```User.swift
-struct User: Codable {
+struct User: Codable, Equatable {
     @DocumentID var id: String?
     var name: String
     var age: Int
+    var createdAt: Timestamp
+    var location: GeoPoint
+}
+
+let user = User(
+    name: "John Doe",
+    age: 30,
+    createdAt: Timestamp(),
+    location: GeoPoint(latitude: 37.7749, longitude: -122.4194)
+)
+
+// Create document
+let ref = try Firestore.firestore()
+    .collection("users")
+    .document("user_id")
+
+try await ref.setData(user)
+
+// Read document
+let snapshot = try await ref.getDocument(type: User.self)
+print(snapshot?.name ?? "Not found")
+
+// Query documents
+let querySnapshot = try await Firestore.firestore()
+    .collection("users")
+    .where(field: "age", isGreaterThan: 25)
+    .getDocuments()
+
+// Transaction
+try await Firestore.firestore().runTransaction { transaction in
+    let snapshot = try await transaction.get(documentReference: ref)
+    if let user = try? snapshot.data(as: User.self) {
+        var updatedUser = user
+        updatedUser.age += 1
+        transaction.update(documentReference: ref, fields: ["age": updatedUser.age])
+    }
+}
+
+// Batch write
+let batch = try Firestore.firestore().batch()
+batch.setData(data: ["name": "Alice"], forDocument: ref)
+batch.updateData(fields: ["age": 31], forDocument: ref)
+try await batch.commit()
+```
+
+### Firebase Auth
+
+```swift
+import FirebaseAuth
+
+let auth = FirebaseAuth()
+
+// Get user by ID
+let user = try await auth.getUser(uid: "user_id")
+
+// List users
+let users = try await auth.listUsers(maxResults: 100)
+
+// Create custom token
+let token = try await auth.createCustomToken(uid: "user_id", claims: ["admin": true])
+```
+
+### Firebase Messaging
+
+```swift
+import FirebaseMessaging
+
+let messaging = try FirebaseMessaging()
+
+let message = Message(
+    token: "device_token",
+    notification: Notification(
+        title: "Hello",
+        body: "World"
+    )
+)
+
+let messageId = try await messaging.send(message: message)
+```
+
+## Built-in Type Support
+
+### Timestamp
+Represents a point in time with nanosecond precision:
+
+```swift
+let now = Timestamp()
+let specific = Timestamp(seconds: 1609459200, nanos: 0)
+let fromDate = Timestamp(date: Date())
+```
+
+### GeoPoint
+Represents geographical coordinates:
+
+```swift
+let location = GeoPoint(latitude: 37.7749, longitude: -122.4194)
+```
+
+### DocumentReference
+Represents a reference to a Firestore document:
+
+```swift
+let userRef = try Firestore.firestore().document("users/user_id")
+```
+
+## Property Wrappers
+
+### @DocumentID
+Automatically populates with the document ID when decoding:
+
+```swift
+struct User: Codable {
+    @DocumentID var id: String?
+    var name: String
 }
 ```
 
-One important thing to note is that the @DocumentID property is not saved as a field in the Firestore document. The reason for this is that Firestore already has a reference to the document through the DocumentReference object, so there's no need to store the ID as a separate field.
+**Note:** `@DocumentID` is not saved as a field in Firestore. It's only populated during decoding.
 
-However, if your User object is nested inside another object, the id property will be saved as a field in the Firestore document for that object. This is because the top-level DocumentReference does not have a reference to the nested User object, so the ID needs to be saved as a field to be able to reference the object later.
+### @ExplicitNull
+Explicitly sets a field to `null` in Firestore:
 
-The @ExplicitNull property wrapper allows you to set a property to nil in Firestore by explicitly setting it to nil in your Swift object:
-
-```User.swift
+```swift
 struct User: Codable {
     var name: String
     @ExplicitNull var age: Int?
 }
 
+var user = User(name: "John", age: 30)
+user.age = nil // This will set the field to null in Firestore
 ```
 
-## Vapor
+## Testing
 
-Here's an example of how to use Firebase Admin for Swift in a Vapor app:
+This project uses **Swift Testing** framework (not XCTest).
 
-```Package.swift
+### Running Tests
 
-// swift-tools-version:5.8
-import PackageDescription
+```bash
+# Run all tests (unit tests only, integration tests are disabled)
+swift test
 
+# Run specific test suite
+swift test --filter FirebaseAppTests
+```
+
+### Test Structure
+
+- **Unit Tests** (✅ Enabled) - No Firebase credentials required
+  - `FirebaseAppTests` - ServiceAccount initialization and configuration
+  - `AppCheckTests` - AppCheck functionality
+
+- **Integration Tests** (⏭️ Disabled by default) - Require actual Firebase credentials
+  - `FirestoreTests` - Firestore path operations
+  - `DocumentTests` - Document CRUD operations
+  - `WhereQueryTests` - Query operations
+  - `RangeQueryTests` - Range and composite queries
+  - `TransactionTests` - Transaction operations
+  - `WriteBatchTests` - Batch write operations
+
+### Running Integration Tests
+
+1. Add valid `ServiceAccount.json` to project root, or set environment variables
+2. Remove `.disabled()` from test suites in `Tests/FirestoreTests/`
+3. Run tests:
+
+```bash
+swift test
+```
+
+## Vapor Integration
+
+Example Vapor 4 integration:
+
+```swift
+// Package.swift
 let package = Package(
-    name: "YOUR_SERVER_APP",
+    name: "VaporApp",
     platforms: [
-        .macOS(.v13), .iOS(.v16)
+        .macOS(.v15)
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.76.0"),
@@ -161,42 +279,92 @@ let package = Package(
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "FirebaseApp", package: "FirebaseAdmin"),
                 .product(name: "Firestore", package: "FirebaseAdmin"),
-            ],
-            resources: [
-                .copy("account_service.json")
-            ],
-            swiftSettings: [
-                .unsafeFlags(["-cross-module-optimization"], .when(configuration: .release))
+                .product(name: "FirebaseAuth", package: "FirebaseAdmin"),
             ]
-        ),
-        .testTarget(name: "AppTests", dependencies: [
-            .target(name: "App"),
-            .product(name: "XCTVapor", package: "vapor"),
-        ])
+        )
     ]
 )
 ```
 
-# Development
+```swift
+// configure.swift
+import Vapor
+import FirebaseApp
 
-To develop this library, you will need a `ServiceAccount.json` file.
+public func configure(_ app: Application) async throws {
+    // Initialize Firebase from environment variables
+    try FirebaseApp.initializeFromEnvironment()
 
-Please copy this file to the `FirestoreTests` directory.
-
-## Development Steps
-
-1. Download the service account key from Firebase Console and save it as `ServiceAccount.json`.
-
-2. Copy the `ServiceAccount.json` file to the `FirestoreTests` directory.
-
-3. Open the project in Xcode and select the `FirestoreTests` target.
-
-```Package.swift
-        .testTarget(
-            name: "FirestoreTests",
-            dependencies: ["Firestore"],
-            resources: [
-                .copy("ServiceAccount.json")
-            ]),
+    // Register routes
+    try routes(app)
+}
 ```
 
+## Development
+
+### Prerequisites
+
+1. **Service Account JSON** - Download from [Firebase Console](https://console.firebase.google.com/)
+   - Go to Project Settings → Service Accounts
+   - Generate new private key
+   - Save as `ServiceAccount.json`
+
+2. **Place the file** in project root:
+   ```
+   FirebaseAdmin/
+   ├── ServiceAccount.json  (gitignored)
+   ├── Package.swift
+   └── ...
+   ```
+
+### Security Notes
+
+⚠️ **Never commit service account credentials to version control!**
+
+The `.gitignore` file already excludes:
+- `ServiceAccount.json`
+- `**/ServiceAccount.json`
+- `firebase-adminsdk-*.json`
+- `.env` files
+
+### Environment Variables Setup
+
+For production deployment, use environment variables:
+
+```bash
+# Example .env file (gitignored)
+FIREBASE_PROJECT_ID=my-project
+FIREBASE_PRIVATE_KEY_ID=abc123...
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@my-project.iam.gserviceaccount.com
+FIREBASE_CLIENT_ID=123456789012345678901
+```
+
+## Architecture
+
+- **FirebaseApp** - Core initialization and service account management
+- **Firestore** - Firestore database operations with gRPC
+- **FirebaseAuth** - User authentication and management
+- **FirebaseMessaging** - Cloud messaging
+- **AppCheck** - App attestation
+
+### Concurrency
+
+This library is built with Swift 6 strict concurrency:
+- Thread-safe with `Sendable` conformance
+- Uses `Mutex<T>` for synchronization
+- Async/await throughout
+
+## License
+
+See [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Links
+
+- [FirebaseAPI](https://github.com/1amageek/FirebaseAPI) - gRPC client generation
+- [Firebase Admin SDK](https://firebase.google.com/docs/admin/setup)
+- [Swift Configuration](https://github.com/apple/swift-configuration)

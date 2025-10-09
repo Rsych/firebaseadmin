@@ -1,36 +1,22 @@
 //
 //  TransactionTests.swift
-//  
+//
 //
 //  Created by Norikazu Muramoto on 2023/05/13.
 //
 
-import XCTest
+import Testing
 @testable import Firestore
 
-final class TransactionTests: XCTestCase {
+@Suite("Transaction Tests", .disabled("Requires actual Firebase credentials"))
+struct TransactionTests {
 
-    override class func setUp() {
-        let serviceAccount = try! loadServiceAccount(from: "ServiceAccount")
-        FirebaseApp.initialize(serviceAccount: serviceAccount)
+    init() throws {
+        try initializeFirebaseForTesting()
     }
 
-    class func loadServiceAccount(from jsonFile: String) throws -> ServiceAccount {
-        guard let path = Bundle.module.path(forResource: jsonFile, ofType: "json")  else {
-            throw NSError(domain: "FileNotFoundError", code: 404, userInfo: [NSLocalizedDescriptionKey: "JSON file not found"])
-        }
-        do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
-            let decoder = JSONDecoder()
-            let serviceAccount = try decoder.decode(ServiceAccount.self, from: data)
-            return serviceAccount
-        } catch {
-            throw NSError(domain: "JSONParsingError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Error parsing JSON file: \(error)"])
-        }
-    }
-
-    func testIncrement() async throws {
-        let firestore = Firestore.firestore()
+    @Test func increment() async throws {
+        let firestore = try Firestore.firestore()
         let ref = firestore.collection("test").document("transaction")
         try await ref.delete()
 
@@ -55,11 +41,11 @@ final class TransactionTests: XCTestCase {
         await increments()
         let snapshot = try await ref.getDocument()
         let documentData = snapshot.data()!
-        XCTAssertEqual(documentData["count"] as! Int, 9)
+        #expect(documentData["count"] as! Int == 9)
     }
 
-    func testMultiIncrement() async throws {
-        let firestore = Firestore.firestore()
+    @Test func multiIncrement() async throws {
+        let firestore = try Firestore.firestore()
         let ref0 = firestore.collection("test").document("transaction0")
         let ref1 = firestore.collection("test").document("transaction1")
         try await ref0.delete()
@@ -93,7 +79,7 @@ final class TransactionTests: XCTestCase {
         await increments()
         let snapshot0 = try await ref0.getDocument()
         let snapshot1 = try await ref1.getDocument()
-        XCTAssertEqual(snapshot0.data()!["count"] as! Int, 9)
-        XCTAssertEqual(snapshot1.data()!["count"] as! Int, 9)
+        #expect(snapshot0.data()!["count"] as! Int == 9)
+        #expect(snapshot1.data()!["count"] as! Int == 9)
     }
 }
