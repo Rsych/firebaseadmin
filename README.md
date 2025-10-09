@@ -340,6 +340,52 @@ FIREBASE_CLIENT_EMAIL=firebase-adminsdk@my-project.iam.gserviceaccount.com
 FIREBASE_CLIENT_ID=123456789012345678901
 ```
 
+### CI/CD Setup
+
+This project includes GitHub Actions workflows for automated testing.
+
+#### Setting up GitHub Secrets
+
+To enable integration tests in CI, add the following secrets to your GitHub repository:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Add the following repository secrets:
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_PRIVATE_KEY_ID`
+   - `FIREBASE_PRIVATE_KEY`
+   - `FIREBASE_CLIENT_EMAIL`
+   - `FIREBASE_CLIENT_ID`
+
+#### Security Considerations
+
+- **Test-only Firebase project**: Use a separate Firebase project for CI/CD testing, not your production project
+- **Minimum permissions**: Create a service account with only the permissions needed for tests
+- **Fork protection**: Integration tests only run on pushes to main or PRs from the same repository (not from forks)
+
+#### Workflow Overview
+
+The CI pipeline runs two jobs:
+
+1. **Unit Tests**: Run on every push and PR (no secrets required)
+   - Tests ServiceAccount initialization and configuration
+   - Tests AppCheck functionality
+
+2. **Integration Tests**: Run only when secrets are available
+   - Automatically enables disabled integration test suites
+   - Tests Firestore operations with real Firebase credentials
+   - Only runs on main branch or same-repository PRs
+
+```bash
+# Manually run tests locally with environment variables
+export FIREBASE_PROJECT_ID="test-project"
+export FIREBASE_PRIVATE_KEY_ID="key-id"
+export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+export FIREBASE_CLIENT_EMAIL="test@test.iam.gserviceaccount.com"
+export FIREBASE_CLIENT_ID="123456789"
+
+swift test
+```
+
 ## Architecture
 
 - **FirebaseApp** - Core initialization and service account management

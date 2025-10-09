@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Run unit tests
+        run: swift test --filter FirebaseAppTests --filter AppCheckTests
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: macos-15
+    # Only run integration tests on push to main or when PR is from the same repository
+    # This prevents exposing secrets to forked PRs
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Enable integration tests
+        run: |
+          # Remove .disabled() from integration test suites
+          find Tests -name "*.swift" -type f -exec sed -i '' 's/@Suite(\(.*\), \.disabled(\(.*\)))/@Suite(\1)/g' {} +
+
+      - name: Run integration tests with Firebase credentials
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
+        run: swift test --filter FirestoreTests
