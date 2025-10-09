@@ -1,7 +1,7 @@
 import Testing
 @testable import Firestore
 
-@Suite("Range Query Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Range Query Tests")
 struct RangeQueryTests {
 
     let path = "test/range/items"
@@ -11,8 +11,8 @@ struct RangeQueryTests {
         var endTime: Timestamp
     }
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     private func setupTestData() async throws {
@@ -232,6 +232,48 @@ struct RangeQueryTests {
                 ])
                 .getDocuments()
             #expect(snapshot.documents.count == 4)
+        }
+    }
+
+    @Test func orderByAscending() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
+        let snapshot = try await ref
+            .order(by: "startTime", descending: false)
+            .getDocuments()
+
+        #expect(snapshot.documents.count == 5)
+
+        // Verify ascending order
+        let timestamps = snapshot.documents.compactMap { doc -> Timestamp? in
+            doc.data()?["startTime"] as? Timestamp
+        }
+
+        for i in 0..<(timestamps.count - 1) {
+            #expect(timestamps[i].seconds <= timestamps[i + 1].seconds)
+        }
+    }
+
+    @Test func orderByDescending() async throws {
+        try await setupTestData()
+        defer { Task { try? await cleanupTestData() } }
+
+        let ref = try Firestore.firestore().collection(path)
+        let snapshot = try await ref
+            .order(by: "startTime", descending: true)
+            .getDocuments()
+
+        #expect(snapshot.documents.count == 5)
+
+        // Verify descending order
+        let timestamps = snapshot.documents.compactMap { doc -> Timestamp? in
+            doc.data()?["startTime"] as? Timestamp
+        }
+
+        for i in 0..<(timestamps.count - 1) {
+            #expect(timestamps[i].seconds >= timestamps[i + 1].seconds)
         }
     }
 }

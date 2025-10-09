@@ -1,11 +1,11 @@
 import Testing
 @testable import Firestore
 
-@Suite("Firestore Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Firestore Tests")
 struct FirestoreTests {
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     @Test func path() async throws {

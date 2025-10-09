@@ -8,11 +8,11 @@
 import Testing
 @testable import Firestore
 
-@Suite("Transaction Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Transaction Tests")
 struct TransactionTests {
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     @Test func increment() async throws {

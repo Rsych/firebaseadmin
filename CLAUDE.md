@@ -22,7 +22,52 @@ swift test --filter FirestoreTests
 swift test --filter FirestoreTests.FirestoreTests/testPath
 ```
 
-**Important**: Tests require a `ServiceAccount.json` file in the `Tests/FirestoreTests/` directory. This file contains Firebase project credentials and should never be committed to version control.
+### Test Configuration
+
+Tests require Firebase credentials. You have **three options**:
+
+#### Option 1: Environment Variables (.env file) - Recommended
+1. Copy `.env.example` to `.env`
+2. Fill in your Firebase credentials:
+```bash
+cp .env.example .env
+# Edit .env with your Firebase project credentials
+```
+
+The `.env` file supports:
+- Simple `KEY=VALUE` format
+- Comments with `#`
+- Quoted values (single or double quotes)
+- Multi-line values (for private keys)
+
+Example:
+```bash
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your-project.iam.gserviceaccount.com
+FIREBASE_CLIENT_ID=123456789
+FIREBASE_PRIVATE_KEY_ID=abc123
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+...your private key...
+-----END PRIVATE KEY-----"
+```
+
+#### Option 2: System Environment Variables
+Set environment variables in your shell:
+```bash
+export FIREBASE_PROJECT_ID=your-project-id
+export FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your-project.iam.gserviceaccount.com
+# ... other variables
+```
+
+#### Option 3: ServiceAccount.json file
+Place `ServiceAccount.json` in one of the following locations (download from Firebase Console):
+- `Tests/ServiceAccount.json` (recommended - easier to manage)
+- `Tests/FirestoreTests/ServiceAccount.json` (original location)
+- Project root directory `ServiceAccount.json`
+
+**Priority**: Environment variables (.env or system) > ServiceAccount.json file
+
+**Important**: Never commit credentials (.env files or ServiceAccount.json) to version control.
 
 ## Architecture
 

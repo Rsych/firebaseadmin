@@ -1,13 +1,13 @@
 import Testing
 @testable import Firestore
 
-@Suite("Where Query Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Where Query Tests")
 struct WhereQueryTests {
 
     let path = "test/where/items"
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     private func setupTestData() async throws {

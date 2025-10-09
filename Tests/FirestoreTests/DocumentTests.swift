@@ -2,25 +2,39 @@ import Testing
 import Foundation
 @testable import Firestore
 
-@Suite("Document Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Document Tests")
 struct DocumentTests {
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     @Test func serverTimestamp() async throws {
-        let ref = try Firestore
-            .firestore()
+        print("[DocumentTests] 🧪 Starting serverTimestamp test")
+
+        print("[DocumentTests] 📝 Getting Firestore instance...")
+        let firestore = try Firestore.firestore()
+        print("[DocumentTests] ✅ Firestore instance obtained")
+
+        print("[DocumentTests] 📝 Getting document reference...")
+        let ref = firestore
             .collection("test")
             .document("serverTimestamp")
+        print("[DocumentTests] ✅ Document reference created: \(ref.path)")
 
+        print("[DocumentTests] 📝 Setting data with serverTimestamp...")
         try await ref.setData([
             "serverTimestamp": FieldValue.serverTimestamp
         ])
+        print("[DocumentTests] ✅ Data set successfully")
+
+        print("[DocumentTests] 📝 Getting document...")
         let snapshot = try await ref.getDocument()
+        print("[DocumentTests] ✅ Document retrieved")
+
         let data = snapshot.data()!
         #expect(data["serverTimestamp"] is Timestamp)
+        print("[DocumentTests] ✅ Test completed successfully")
     }
 
     @Test func convertTimestampToDate() async throws {

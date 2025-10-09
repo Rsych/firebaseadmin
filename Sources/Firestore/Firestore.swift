@@ -26,6 +26,10 @@ extension Firestore where Transport == HTTP2ClientTransport.Posix {
         public var value: String { "https://www.googleapis.com/auth/cloud-platform" }
     }
 
+    /// Cached Firestore instance (singleton)
+    private nonisolated(unsafe) static var cachedInstance: Firestore<HTTP2ClientTransport.Posix>?
+    private static let cacheLock = NSLock()
+
     /**
      Returns a `Firestore` instance initialized with the default `FirebaseApp` instance.
 
@@ -36,12 +40,20 @@ extension Firestore where Transport == HTTP2ClientTransport.Posix {
      - Returns: A `Firestore` instance initialized with the default `FirebaseApp` instance.
      */
     public static func firestore(app: FirebaseApp = FirebaseApp.app) throws -> Firestore<HTTP2ClientTransport.Posix> {
+        // Check cache first
+        cacheLock.lock()
+        if let cached = cachedInstance {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
         guard let serviceAccount = app.serviceAccount else {
             throw NSError(domain: "ServiceAccountError", code: 500, userInfo: [NSLocalizedDescriptionKey: "Service Account is not initialized"])
         }
 
         let transport = try HTTP2ClientTransport.Posix(
-            target: .dns(host: "firestore.googleapis.com"),
+            target: .dns(host: "firestore.googleapis.com", port: 443),
             transportSecurity: .tls,
             config: .defaults(configure: { $0.http2.targetWindowSize = 65535 })
         )
@@ -53,6 +65,11 @@ extension Firestore where Transport == HTTP2ClientTransport.Posix {
             transport: transport,
             accessTokenProvider: accessTokenProvider
         )
+
+        // Cache the instance
+        cacheLock.lock()
+        cachedInstance = firestore
+        cacheLock.unlock()
 
         return firestore
     }

@@ -44,6 +44,10 @@ public final class AccessTokenProvider: FirestoreAPI.AccessTokenProvider, Sendab
     // Mutexで保護されたトークンキャッシュ
     private let cache = Mutex<TokenCache>(TokenCache())
 
+    // HTTPClientとEventLoopGroupを再利用
+    private let httpClient: HTTPClient
+    private let eventLoopGroup: MultiThreadedEventLoopGroup
+
     // トークンキャッシュ構造体
     struct TokenCache: Sendable {
         var accessToken: String?
@@ -54,6 +58,25 @@ public final class AccessTokenProvider: FirestoreAPI.AccessTokenProvider, Sendab
         self.serviceAccount = serviceAccount
         let privateKey = try RSAKey.private(pem: serviceAccount.privateKeyPem)
         self.signer = JWTSigner.rs256(key: privateKey)
+
+        // HTTPClientとEventLoopGroupを初期化時に作成（再利用）
+        self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+
+        var configuration = HTTPClient.Configuration()
+        configuration.tlsConfiguration = .clientDefault
+        configuration.tlsConfiguration?.certificateVerification = .fullVerification
+        configuration.httpVersion = .automatic
+
+        self.httpClient = HTTPClient(
+            eventLoopGroupProvider: .shared(eventLoopGroup),
+            configuration: configuration
+        )
+    }
+
+    deinit {
+        // クリーンアップ
+        try? httpClient.syncShutdown()
+        try? eventLoopGroup.syncShutdownGracefully()
     }
 
     /**
@@ -103,13 +126,7 @@ public final class AccessTokenProvider: FirestoreAPI.AccessTokenProvider, Sendab
 
     private func requestAccessToken(signedJwt: String) async throws -> String {
         let url = URL(string: "https://\(GOOGLE_AUTH_TOKEN_HOST)\(GOOGLE_AUTH_TOKEN_PATH)")!
-        var configuration = HTTPClient.Configuration()
-        configuration.tlsConfiguration = .clientDefault
-        // Use full certificate verification for security
-        configuration.tlsConfiguration?.certificateVerification = .fullVerification
-        configuration.httpVersion = .automatic
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-        let client = HTTPClient(eventLoopGroupProvider: .shared(eventLoopGroup))
+
         let body = "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=\(signedJwt)"
         let request = try HTTPClient.Request(
             url: url,
@@ -119,20 +136,22 @@ public final class AccessTokenProvider: FirestoreAPI.AccessTokenProvider, Sendab
             ]),
             body: HTTPClient.Body.data(body.data(using: .utf8)!)
         )
-        let response = try await client.execute(request: request).get()
-        try await client.shutdown()
-        try await eventLoopGroup.shutdownGracefully()
+
+        let response = try await httpClient.execute(request: request).get()
+
         guard
             var body = response.body,
             let responseBodyData = body.readData(length: body.readableBytes)
         else {
             throw NSError(domain: "FirestoreAccessTokenProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response from token endpoint"])
         }
+
         guard
             let json = try JSONSerialization.jsonObject(with: responseBodyData, options: []) as? [String: Any],
             let accessToken = json["access_token"] as? String else {
             throw NSError(domain: "FirestoreAccessTokenProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Access token not found in token endpoint response"])
         }
+
         return accessToken
     }
 

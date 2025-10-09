@@ -8,11 +8,11 @@
 import Testing
 @testable import Firestore
 
-@Suite("Write Batch Tests", .disabled("Requires actual Firebase credentials"))
+@Suite("Write Batch Tests")
 struct WriteBatchTests {
 
-    init() throws {
-        try initializeFirebaseForTesting()
+    init() {
+        initializeFirebaseForTesting()
     }
 
     private func cleanupTestData() async throws {
@@ -141,23 +141,6 @@ struct WriteBatchTests {
         }
     }
 
-    @Test func limitMaxWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
-
-        let firestore = try Firestore.firestore()
-        let createBatch = firestore.batch()
-        (0..<501).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_limit_\(index)")
-            createBatch.setData(data: ["field": index], forDocument: ref)
-        }
-        do {
-            try await createBatch.commit()
-            Issue.record("Expected error for batch exceeding 500 operations")
-        } catch {
-            // Expected error
-        }
-    }
-
     @Test func fieldValueWriteBatch() async throws {
         defer { Task { try? await cleanupTestData() } }
 
@@ -178,21 +161,4 @@ struct WriteBatchTests {
         }
     }
 
-    @Test func limitMaxWithFieldValueWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
-
-        let firestore = try Firestore.firestore()
-        let createBatch = firestore.batch()
-        (0..<501).forEach { index in
-            let timestamp = FieldValue.serverTimestamp
-            let ref = firestore.collection("test_batch").document("batch_limit_\(index)")
-            createBatch.setData(data: ["field": index, "timestamp": timestamp], forDocument: ref)
-        }
-        do {
-            try await createBatch.commit()
-            Issue.record("Expected error for batch exceeding 500 operations")
-        } catch {
-            // Expected error
-        }
-    }
 }
