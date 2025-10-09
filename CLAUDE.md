@@ -43,7 +43,7 @@ swift test --filter FirestoreTests.FirestoreTests/testPath
    - **Firestore**: Wraps googleapis/FirebaseAPI for document/collection operations, uses gRPC-style API with HPACK headers
    - **FirebaseAuth**: User authentication management via AuthClient
    - **FirebaseMessaging**: FCM message sending via MessagingClient
-   - **AppCheck**: App attestation verification
+   - **AppCheck**: Server-side App Check token verification for protecting backend APIs from unauthorized clients
 
 ### Authentication Flow
 
@@ -60,6 +60,23 @@ Firestore uses the FirebaseAPI package (github.com/1amageek/FirebaseAPI) which w
 - Built-in Codable support for Firestore types (Timestamp, GeoPoint, DocumentReference)
 - Property wrappers: `@DocumentID` (auto-populated, not saved at top level), `@ExplicitNull` (explicit nil encoding)
 - Access tokens obtained via AccessTokenProvider, attached as HPACK headers
+
+### AppCheck Integration
+
+AppCheck provides server-side verification of App Check tokens sent by client applications:
+- **JWKS Endpoint**: `https://firebaseappcheck.googleapis.com/v1/jwks` (App Check-specific, not Firebase Auth)
+- **Token Verification**: Validates JWT signatures using RS256 algorithm with public keys from JWKS
+- **Claims Validation**: Verifies issuer, audience (project ID/number), and expiration
+- **JWKS Caching**: Public keys cached for 6 hours (Firebase recommendation) with automatic refresh
+- **Actor-based**: Thread-safe implementation using Swift 6 actor pattern
+- **Token Source**: Clients send App Check tokens in `X-Firebase-AppCheck` HTTP header
+
+#### AppCheck Token Structure
+- `iss`: Issuer - `https://firebaseappcheck.googleapis.com/<project-number>`
+- `sub`: Subject - Firebase App ID
+- `aud`: Audience - Array of project identifiers (`projects/<project-id>` or `projects/<project-number>`)
+- `exp`: Expiration timestamp
+- `iat`: Issued at timestamp
 
 ### Concurrency
 
@@ -109,9 +126,53 @@ let messaging = try FirebaseMessaging.getMessaging()
 // Send FCM messages
 ```
 
+**AppCheck operations:**
+```swift
+// Initialize with explicit project ID
+let appCheck = AppCheck(projectID: "your-project-id")
+
+// Or initialize from FirebaseApp (uses serviceAccount.projectId)
+let appCheck = try AppCheck()
+
+// Verify App Check token from client request
+let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
+let token = request.headers["X-Firebase-AppCheck"].first ?? ""
+
+do {
+    let payload = try await appCheck.verifyToken(token, client: httpClient)
+    print("Valid token from app: \(payload.sub.value)")
+    // Proceed with request processing
+} catch AppCheckError.invalidAudience(let expected, let actual) {
+    // Token audience mismatch
+    throw Abort(.unauthorized, reason: "Invalid app")
+} catch AppCheckError.expiredToken {
+    // Token expired
+    throw Abort(.unauthorized, reason: "Token expired")
+} catch {
+    // Other verification errors
+    throw Abort(.unauthorized, reason: "Invalid App Check token")
+}
+
+// Clear JWKS cache (forces refresh on next verification)
+await appCheck.clearCache()
+```
+
 ## Important Notes
 
 - ServiceAccount.json contains sensitive credentials - never commit it
 - All async operations in FirebaseAPIClient use EventLoopFuture, not async/await
 - Firestore uses HPACK headers (from NIOHPACK) for gRPC-style API communication
 - The package re-exports FirebaseApp and FirestoreAPI types for convenience
+
+### AppCheck Specific Notes
+
+- **Correct JWKS Endpoint**: Use `https://firebaseappcheck.googleapis.com/v1/jwks` (NOT the Firebase Auth endpoint)
+- **JWKS Caching**: Public keys are cached for 6 hours as recommended by Firebase to reduce API calls
+- **Token Header**: Clients must send App Check tokens in the `X-Firebase-AppCheck` HTTP header
+- **Actor Isolation**: AppCheck is implemented as an actor for thread-safety in Swift 6
+- **Sendable Compliance**: Uses `@preconcurrency import JWTKit` for compatibility with non-Sendable JWT types
+- **Validation Levels**:
+  - Basic: JWT signature + expiration (always performed)
+  - Enhanced: Issuer validation (requires project number)
+  - Strict: Audience validation (requires project ID, always performed)
+- **Error Handling**: AppCheckError provides detailed error cases for debugging (invalid issuer, audience mismatch, etc.)
