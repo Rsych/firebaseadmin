@@ -286,7 +286,7 @@ struct AppCheckTests {
     @Test("FirebaseApp integration - AppCheck initialization")
     func firebaseAppIntegration() async throws {
         // Test that AppCheck() initializer behaves correctly with FirebaseApp
-        // Note: FirebaseApp may already be initialized by other tests (it's a singleton)
+        // Note: FirebaseApp may or may not be initialized by other tests
 
         do {
             let appCheck = try AppCheck()
@@ -294,10 +294,13 @@ struct AppCheckTests {
             // The appCheck instance should be valid
             _ = appCheck
         } catch AppCheckError.invalidProjectID {
-            // If FirebaseApp is not initialized, should throw invalidProjectID
+            // If FirebaseApp exists but has no serviceAccount
             // This is expected behavior
+        } catch FirebaseAppError.noApp {
+            // If FirebaseApp doesn't exist yet
+            // This is expected behavior in test isolation
         } catch {
-            Issue.record("Expected either success or invalidProjectID error, got: \(error)")
+            Issue.record("Expected either success, invalidProjectID, or noApp error, got: \(error)")
         }
     }
 

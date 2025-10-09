@@ -160,8 +160,16 @@ private let firebaseInitializer: Void = {
     do {
         let serviceAccount = try loadServiceAccount()
         print("[TestHelpers] ✅ ServiceAccount loaded")
-        FirebaseApp.initialize(serviceAccount: serviceAccount)
-        print("[TestHelpers] ✅ FirebaseApp initialized")
+
+        // Check if default app already exists (from previous test runs)
+        if let _ = try? FirebaseApp.app() {
+            print("[TestHelpers] ℹ️  FirebaseApp already initialized, skipping")
+        } else {
+            try FirebaseApp.initialize(serviceAccount: serviceAccount)
+            print("[TestHelpers] ✅ FirebaseApp initialized")
+        }
+    } catch FirebaseAppError.duplicateApp {
+        print("[TestHelpers] ℹ️  FirebaseApp already initialized (duplicate)")
     } catch {
         print("[TestHelpers] ❌ Failed to initialize: \(error)")
         fatalError("Failed to initialize Firebase for testing: \(error)")

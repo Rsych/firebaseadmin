@@ -13,7 +13,7 @@ import JWTKit
 import NIOFoundationCompat
 import NIO
 
-public struct FirebaseError: Codable {
+public struct FirebaseError: Codable, Sendable {
     public let code: Int?
     public let message: String?
 }
@@ -28,14 +28,14 @@ public enum FirebaseAPIError: Error {
     case invalidResponse
 }
 
-public class FirebaseAPIClient {
-    
+public class FirebaseAPIClient: @unchecked Sendable {
+
     let httpClient: HTTPClient
     var serviceAccount: ServiceAccount?
     let endpoint: FirebaseEndpoint
     let decoder: JSONDecoder
     let eventLoopGroup: EventLoopGroup
-    
+
     public init(serviceAccount: ServiceAccount? = nil) {
         self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(eventLoopGroup))
@@ -43,9 +43,9 @@ public class FirebaseAPIClient {
         self.endpoint = FirebaseEndpoint()
         self.decoder = JSONDecoder()
     }
-    
+
     deinit {
-        try? httpClient.shutdown()
+        try? httpClient.syncShutdown()
     }
     
     public func throwIfError(response: HTTPClient.Response, body: ByteBuffer) throws {
@@ -62,7 +62,7 @@ public class FirebaseAPIClient {
         throw NSError(domain: "FirebaseAPIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not parse response"])
     }
     
-    public func makeAuthenticatedPost<T: Codable>(endpoint: String, body: Codable? = nil) -> EventLoopFuture<T> {
+    public func makeAuthenticatedPost<T: Codable & Sendable>(endpoint: String, body: (any Sendable & Codable)? = nil) -> EventLoopFuture<T> {
         return getOAuthToken().flatMap { token in
             do {
                 var request = try HTTPClient.Request(url: endpoint, method: .POST)
@@ -71,13 +71,13 @@ public class FirebaseAPIClient {
                 if let body = body {
                     request.body = .data(try JSONEncoder().encode(body))
                 }
-                
+
                 return self.httpClient.execute(request: request).flatMap { response in
                     guard var byteBuffer = response.body else {
                         return self.httpClient.eventLoopGroup.next().makeFailedFuture(FirebaseAPIError.missingResponseBody)
                     }
                     let responseData = byteBuffer.readData(length: byteBuffer.readableBytes)!
-                    
+
                     do {
                         guard response.status == .ok else {
                             return self.httpClient.eventLoopGroup.next().makeFailedFuture(try self.decoder.decode(FirebaseErrorResponse.self, from: responseData))
@@ -93,7 +93,7 @@ public class FirebaseAPIClient {
         }
     }
     
-    public func makeAuthenticatedPost(endpoint: String, body: Encodable? = nil) -> EventLoopFuture<Data> {
+    public func makeAuthenticatedPost(endpoint: String, body: (any Sendable & Encodable)? = nil) -> EventLoopFuture<Data> {
         return getOAuthToken().flatMap { token in
             do {
                 var request = try HTTPClient.Request(url: endpoint, method: .POST)
@@ -171,7 +171,7 @@ public class FirebaseAPIClient {
     }
 }
 
-struct OAuthTokenResponse: Codable {
+struct OAuthTokenResponse: Codable, Sendable {
     static let cacheKey = "OauthTokenResponse"
     let access_token: String
     let expires_in: Int

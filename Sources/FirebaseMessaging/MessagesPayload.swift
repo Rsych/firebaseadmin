@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct FcmNotification: Codable {
+public struct FcmNotification: Codable, Sendable {
     public let title: String?
     public let body: String?
     public let imageURL: String?
@@ -29,7 +29,7 @@ public struct FcmNotification: Codable {
     }
 }
 
-public struct AndroidConfig: Codable {
+public struct AndroidConfig: Codable, Sendable {
     public let collapseKey: String?
     public let priority: String?
     public let restrictedPackageName: String?
@@ -59,7 +59,7 @@ public struct AndroidConfig: Codable {
     }
 }
 
-public struct AndroidNotification: Codable {
+public struct AndroidNotification: Codable, Sendable {
     public var clickAction: String
     
     enum CodingKeys: String, CodingKey {
@@ -71,7 +71,7 @@ public struct AndroidNotification: Codable {
     }
 }
 
-struct WebpushFCMOptions: Codable {
+struct WebpushFCMOptions: Codable, Sendable {
     public let link: String?
     
     enum CodingKeys: String, CodingKey {
@@ -83,7 +83,7 @@ struct WebpushFCMOptions: Codable {
     }
 }
 
-public struct FCMOptions: Codable {
+public struct FCMOptions: Codable, Sendable {
     public let analyticsLabel: String?
     
     enum CodingKeys: String, CodingKey {
@@ -95,7 +95,7 @@ public struct FCMOptions: Codable {
     }
 }
 
-public struct FcmMessage: Codable {
+public struct FcmMessage: Codable, Sendable {
     public let data: [String: String]?
     public let notification: FcmNotification?
     public let android: AndroidConfig?
@@ -133,7 +133,7 @@ public struct FcmMessage: Codable {
     }
 }
 
-public struct SendResponse: Codable {
+public struct SendResponse: Codable, Sendable {
     public var success: Bool
     public var messageID: String
     public var error: String?
@@ -144,7 +144,7 @@ public struct SendResponse: Codable {
     }
 }
 
-struct FcmRequest: Codable {
+struct FcmRequest: Codable, Sendable {
     public var validateOnly: Bool
     public var message: FcmMessage
     

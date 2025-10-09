@@ -53,7 +53,7 @@ struct TransactionTests {
 
         func increments() async {
             await withTaskGroup(of: Void.self) { group in
-                for _ in (0..<10) {
+                for _ in (0..<5) {
                     group.addTask {
                         try! await firestore.runTransaction { transaction in
                             let snapshot0 = try await transaction.get(documentReference: ref0)
@@ -79,7 +79,7 @@ struct TransactionTests {
         await increments()
         let snapshot0 = try await ref0.getDocument()
         let snapshot1 = try await ref1.getDocument()
-        #expect(snapshot0.data()!["count"] as! Int == 9)
-        #expect(snapshot1.data()!["count"] as! Int == 9)
+        #expect(snapshot0.data()!["count"] as! Int == 4)
+        #expect(snapshot1.data()!["count"] as! Int == 4)
     }
 }

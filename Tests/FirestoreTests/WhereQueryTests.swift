@@ -4,13 +4,11 @@ import Testing
 @Suite("Where Query Tests")
 struct WhereQueryTests {
 
-    let path = "test/where/items"
-
     init() {
         initializeFirebaseForTesting()
     }
 
-    private func setupTestData() async throws {
+    private func setupTestData(path: String) async throws {
         let ref = try Firestore.firestore().collection(path)
         func isEven(_ number: Int) -> Bool {
             return number % 2 == 0
@@ -25,7 +23,7 @@ struct WhereQueryTests {
         try await batch.commit()
     }
 
-    private func cleanupTestData() async throws {
+    private func cleanupTestData(path: String) async throws {
         let firestore = try Firestore.firestore()
         let collection = firestore.collection(path)
         let snapshot = try await collection.getDocuments()
@@ -35,8 +33,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsEqualTo() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isEqualTo"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -55,8 +54,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsNotEqualTo() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isNotEqualTo"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -75,8 +75,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsLessThan() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isLessThan"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -95,8 +96,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsLessThanOrEqualTo() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isLessThanOrEqualTo"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -115,8 +117,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsGreaterThan() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isGreaterThan"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -135,8 +138,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIsGreaterThanOrEqualTo() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_isGreaterThanOrEqualTo"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -155,8 +159,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryIn() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_in"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {
@@ -175,8 +180,9 @@ struct WhereQueryTests {
     }
 
     @Test func whereQueryNotIn() async throws {
-        try await setupTestData()
-        defer { Task { try? await cleanupTestData() } }
+        let path = "test_where_notIn"
+        try await setupTestData(path: path)
+        defer { Task { try? await cleanupTestData(path: path) } }
 
         let ref = try Firestore.firestore().collection(path)
         do {

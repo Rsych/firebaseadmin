@@ -15,8 +15,8 @@ struct WriteBatchTests {
         initializeFirebaseForTesting()
     }
 
-    private func cleanupTestData() async throws {
-        let snapshot = try await Firestore.firestore().collection("test_batch")
+    private func cleanupCollection(_ collectionID: String) async throws {
+        let snapshot = try await Firestore.firestore().collection(collectionID)
             .getDocuments()
         let batch = try Firestore.firestore().batch()
         snapshot.documents.forEach { snapshot in
@@ -26,17 +26,18 @@ struct WriteBatchTests {
     }
 
     @Test func createWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_create"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let batch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_create_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             batch.setData(data: ["field": index], forDocument: ref)
         }
         try await batch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_create_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             let data = snapshot.data()!
             #expect(data["field"] as! Int == index)
@@ -44,23 +45,24 @@ struct WriteBatchTests {
     }
 
     @Test func setDataWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_setData"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let createBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_setData_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             createBatch.setData(data: ["count": index, "name": "name"], forDocument: ref)
         }
         try await createBatch.commit()
         let updateBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_setData_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             updateBatch.setData(data: ["field": index + 1], forDocument: ref)
         }
         try await updateBatch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_setData_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             let data = snapshot.data()!
             #expect(data["field"] as! Int == index + 1)
@@ -69,23 +71,24 @@ struct WriteBatchTests {
     }
 
     @Test func setDataMergeWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_setDataMerge"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let createBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_setDataMerge_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             createBatch.setData(data: ["count": index, "name": "name"], forDocument: ref)
         }
         try await createBatch.commit()
         let updateBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_setDataMerge_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             updateBatch.setData(data: ["field": index + 1], forDocument: ref, merge: true)
         }
         try await updateBatch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_setDataMerge_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             let data = snapshot.data()!
             #expect(data["field"] as! Int == index + 1)
@@ -94,23 +97,24 @@ struct WriteBatchTests {
     }
 
     @Test func updateWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_update"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let createBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_update_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             createBatch.setData(data: ["count": index, "name": "name"], forDocument: ref)
         }
         try await createBatch.commit()
         let updateBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_update_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             updateBatch.updateData(fields: ["field": index + 1], forDocument: ref)
         }
         try await updateBatch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_update_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             let data = snapshot.data()!
             #expect(data["field"] as! Int == index + 1)
@@ -119,41 +123,43 @@ struct WriteBatchTests {
     }
 
     @Test func deleteWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_delete"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let createBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             createBatch.setData(data: ["field": index], forDocument: ref)
         }
         try await createBatch.commit()
         let deleteBatch = firestore.batch()
         (0..<5).forEach { index in
-            let ref = firestore.collection("test_batch").document("batch_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             deleteBatch.deleteDocument(document: ref)
         }
         try await deleteBatch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             #expect(snapshot.exists == false)
         }
     }
 
     @Test func fieldValueWriteBatch() async throws {
-        defer { Task { try? await cleanupTestData() } }
+        let collectionID = "test_batch_fieldValue"
+        defer { Task { try? await cleanupCollection(collectionID) } }
 
         let firestore = try Firestore.firestore()
         let createBatch = firestore.batch()
         (0..<5).forEach { index in
             let timestamp = FieldValue.serverTimestamp
-            let ref = firestore.collection("test_batch").document("batch_fieldvalue_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             createBatch.setData(data: ["field": index, "timestamp": timestamp], forDocument: ref)
         }
         try await createBatch.commit()
         for index in (0..<5) {
-            let ref = firestore.collection("test_batch").document("batch_fieldvalue_\(index)")
+            let ref = firestore.collection(collectionID).document("doc_\(index)")
             let snapshot = try await ref.getDocument()
             let data = snapshot.data()!
             #expect(data["field"] as! Int == index)

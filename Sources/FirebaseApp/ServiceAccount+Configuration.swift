@@ -101,9 +101,10 @@ extension ServiceAccount {
         let config: ConfigReader
 
         if let jsonPath = jsonPath {
-            config = try await ConfigReader(providers: [
+            let jsonProvider = try await JSONProvider(filePath: FilePath(jsonPath))
+            config = ConfigReader(providers: [
                 EnvironmentVariablesProvider(),
-                try await JSONProvider(filePath: FilePath(jsonPath))
+                jsonProvider
             ])
         } else {
             config = ConfigReader(provider: EnvironmentVariablesProvider())

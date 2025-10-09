@@ -22,7 +22,7 @@ public class MessagingClient {
     // MARK: - Send FCM Message
     public func send(_ message: FcmMessage, dryRun: Bool = false) async throws {
         let endpoint = FirebaseEndpoint.messages(.send, projectID: serviceAccount.projectId).fullURL
-        let responseData = try await api.makeAuthenticatedPost(
+        _ = try await api.makeAuthenticatedPost(
             endpoint: endpoint,
             body: FcmRequest(validateOnly: dryRun, message: message)
         ).get()

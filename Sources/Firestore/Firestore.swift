@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 @_exported import FirestoreAPI
 @_exported import FirebaseApp
 @_exported import GRPCNIOTransportHTTP2
@@ -9,6 +10,90 @@ import Foundation
  This is the default transport implementation for Firestore.
  */
 public typealias FirestoreHTTP2 = Firestore<HTTP2ClientTransport.Posix>
+
+// MARK: - Firestore Factory
+
+/// Internal factory for managing Firestore instances per app
+internal final class FirestoreFactory: Sendable {
+    static let shared = FirestoreFactory()
+
+    private let cache = Mutex<[String: Firestore<HTTP2ClientTransport.Posix>]>([:])
+
+    private init() {}
+
+    func getOrCreate(for app: FirebaseApp) throws -> Firestore<HTTP2ClientTransport.Posix> {
+        return try cache.withLock { cache in
+            // Return cached instance if available
+            if let cached = cache[app.name] {
+                return cached
+            }
+
+            // Create new instance
+            let firestore = try createFirestore(for: app)
+            cache[app.name] = firestore
+            return firestore
+        }
+    }
+
+    func clear(for appName: String) {
+        cache.withLock { cache in
+            cache.removeValue(forKey: appName)
+        }
+    }
+
+    func clearAll() {
+        cache.withLock { cache in
+            cache.removeAll()
+        }
+    }
+
+    private func createFirestore(for app: FirebaseApp) throws -> Firestore<HTTP2ClientTransport.Posix> {
+        let transport = try HTTP2ClientTransport.Posix(
+            target: .dns(host: "firestore.googleapis.com", port: 443),
+            transportSecurity: .tls,
+            config: .defaults(configure: { $0.http2.targetWindowSize = 65535 })
+        )
+
+        let accessTokenProvider = try AccessTokenProvider(serviceAccount: app.serviceAccount)
+
+        let firestore = Firestore(
+            projectId: app.serviceAccount.projectId,
+            transport: transport,
+            accessTokenProvider: accessTokenProvider
+        )
+
+        return firestore
+    }
+}
+
+// MARK: - FirebaseApp Extension
+
+/**
+ Extension providing Firestore factory method on FirebaseApp.
+ */
+extension FirebaseApp {
+
+    /**
+     Returns a `Firestore` instance for this app.
+
+     Use this method to obtain a `Firestore` instance that is initialized with this app's
+     service account. The instance is cached per app, so subsequent calls return the same instance.
+
+     Example:
+     ```swift
+     let app = try FirebaseApp.initialize(serviceAccount: serviceAccount)
+     let firestore = try app.firestore()
+     ```
+
+     - Returns: A `Firestore` instance initialized with this app's service account.
+     - Throws: Error if Firestore initialization fails
+     */
+    public func firestore() throws -> Firestore<HTTP2ClientTransport.Posix> {
+        return try FirestoreFactory.shared.getOrCreate(for: self)
+    }
+}
+
+// MARK: - Convenience Methods
 
 /**
  Extension providing convenience methods for creating Firestore instances.
@@ -26,52 +111,37 @@ extension Firestore where Transport == HTTP2ClientTransport.Posix {
         public var value: String { "https://www.googleapis.com/auth/cloud-platform" }
     }
 
-    /// Cached Firestore instance (singleton)
-    private nonisolated(unsafe) static var cachedInstance: Firestore<HTTP2ClientTransport.Posix>?
-    private static let cacheLock = NSLock()
-
     /**
      Returns a `Firestore` instance initialized with the default `FirebaseApp` instance.
 
-     - Parameter app: The `FirebaseApp` instance to use for authenticating with the Firestore database.
+     This is a convenience method that gets the default FirebaseApp and returns its Firestore instance.
 
-     Use this method to obtain a `Firestore` instance that is initialized with the default `FirebaseApp` instance. This is useful if your app uses only one Firebase project and you need to access only one Firestore database.
+     Example:
+     ```swift
+     // Initialize default app first
+     try FirebaseApp.initialize(serviceAccount: serviceAccount)
+
+     // Get Firestore from default app
+     let firestore = try Firestore.firestore()
+     ```
 
      - Returns: A `Firestore` instance initialized with the default `FirebaseApp` instance.
+     - Throws: Error if default app is not initialized or Firestore creation fails
      */
-    public static func firestore(app: FirebaseApp = FirebaseApp.app) throws -> Firestore<HTTP2ClientTransport.Posix> {
-        // Check cache first
-        cacheLock.lock()
-        if let cached = cachedInstance {
-            cacheLock.unlock()
-            return cached
-        }
-        cacheLock.unlock()
+    public static func firestore() throws -> Firestore<HTTP2ClientTransport.Posix> {
+        let app = try FirebaseApp.app()
+        return try app.firestore()
+    }
 
-        guard let serviceAccount = app.serviceAccount else {
-            throw NSError(domain: "ServiceAccountError", code: 500, userInfo: [NSLocalizedDescriptionKey: "Service Account is not initialized"])
-        }
+    /**
+     Returns a `Firestore` instance for the specified app.
 
-        let transport = try HTTP2ClientTransport.Posix(
-            target: .dns(host: "firestore.googleapis.com", port: 443),
-            transportSecurity: .tls,
-            config: .defaults(configure: { $0.http2.targetWindowSize = 65535 })
-        )
-
-        let accessTokenProvider = try AccessTokenProvider(serviceAccount: serviceAccount)
-
-        let firestore = Firestore(
-            projectId: serviceAccount.projectId,
-            transport: transport,
-            accessTokenProvider: accessTokenProvider
-        )
-
-        // Cache the instance
-        cacheLock.lock()
-        cachedInstance = firestore
-        cacheLock.unlock()
-
-        return firestore
+     - Parameter app: The `FirebaseApp` instance to use
+     - Returns: A `Firestore` instance initialized with the app's service account
+     - Throws: Error if Firestore creation fails
+     */
+    public static func firestore(app: FirebaseApp) throws -> Firestore<HTTP2ClientTransport.Posix> {
+        return try app.firestore()
     }
 
     /**

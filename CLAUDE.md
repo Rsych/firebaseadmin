@@ -74,9 +74,11 @@ Place `ServiceAccount.json` in one of the following locations (download from Fir
 ### Core Components
 
 1. **FirebaseApp** (Sources/FirebaseApp/)
-   - Singleton that manages the Firebase service account
+   - Multi-instance registry that manages Firebase app configurations
+   - Supports multiple named instances for connecting to different Firebase projects
    - Must be initialized before using any Firebase services via `FirebaseApp.initialize(serviceAccount:)`
-   - Thread-safe using NSLock for concurrent access to service account
+   - Thread-safe using `Mutex` (Swift Synchronization framework) for concurrent access
+   - Each app instance holds an immutable `ServiceAccount` configuration
 
 2. **FirebaseAPIClient** (Sources/FirebaseApp/FirebaseAPIClient.swift)
    - Handles OAuth2 authentication using JWT with RSA256 signing
@@ -93,10 +95,18 @@ Place `ServiceAccount.json` in one of the following locations (download from Fir
 ### Authentication Flow
 
 All services follow this pattern:
-1. Get ServiceAccount from FirebaseApp singleton
+1. Get ServiceAccount from FirebaseApp instance
 2. Create JWT signed with service account's private key (RS256)
 3. Exchange JWT for OAuth access token
 4. Use OAuth token as Bearer token in API requests
+
+### Service Factory Pattern
+
+Each service (Firestore, Auth, Messaging) uses a factory pattern:
+- Factory classes (`FirestoreFactory`, `AuthClientFactory`, `MessagingClientFactory`) cache service instances per app
+- Services are accessed via `FirebaseApp` extension methods (e.g., `app.firestore()`)
+- Convenience methods allow access to default app services (e.g., `Firestore.firestore()`)
+- All factories are thread-safe using `Mutex` and conform to `Sendable`
 
 ### Firestore Integration
 
@@ -127,7 +137,9 @@ AppCheck provides server-side verification of App Check tokens sent by client ap
 
 - Targets use Swift 6 strict concurrency (`StrictConcurrency=targeted` or `StrictConcurrency`)
 - Upcoming features enabled: `DisableOutwardActorInference`, `SWIFT_UPCOMING_FEATURE_FORWARD_TRAILING_CLOSURES`
-- FirebaseApp marked `@unchecked Sendable` with internal locking
+- FirebaseApp and all factory classes use `Mutex` from Swift Synchronization framework for thread-safety
+- All shared state is protected with `Mutex<T>` for type-safe, deadlock-free concurrent access
+- Factory classes are `final` and conform to `Sendable` for Swift 6 compliance
 - EventLoopFuture-based async operations (not async/await in FirebaseAPIClient)
 
 ## Package Structure
@@ -138,48 +150,111 @@ AppCheck provides server-side verification of App Check tokens sent by client ap
 
 ## Development Workflow
 
-1. Add `ServiceAccount.json` to `Tests/FirestoreTests/` (obtain from Firebase Console)
-2. The test targets use `Bundle.module.path(forResource:ofType:)` to load the service account
-3. Initialize FirebaseApp in test setUp: `FirebaseApp.initialize(serviceAccount: serviceAccount)`
-4. Use `try Firestore.firestore()` or `try FirebaseAuth.auth()` to get service instances
+1. Add `ServiceAccount.json` to `Tests/` or use environment variables (see Test Configuration above)
+2. Initialize FirebaseApp before using any services
+3. Access services via the app instance or convenience methods
+4. Clean up apps when done (especially in tests)
 
 ## Common Patterns
 
-**Initialize app:**
+### Initialize FirebaseApp
+
+**Option 1: Default app (recommended for single project)**
 ```swift
-let serviceAccount = try FirebaseApp.loadServiceAccount(from: "ServiceAccount")
-FirebaseApp.initialize(serviceAccount: serviceAccount)
+let serviceAccount = try ServiceAccount.load(from: "ServiceAccount.json")
+let app = try FirebaseApp.initialize(serviceAccount: serviceAccount)
 ```
 
-**Firestore operations:**
+**Option 2: Named apps (for multiple projects)**
+```swift
+let account1 = try ServiceAccount.load(from: "Project1.json")
+let account2 = try ServiceAccount.load(from: "Project2.json")
+
+let app1 = try FirebaseApp.initialize(name: "project1", serviceAccount: account1)
+let app2 = try FirebaseApp.initialize(name: "project2", serviceAccount: account2)
+```
+
+**Option 3: From environment variables**
+```swift
+let app = try FirebaseApp.initializeFromEnvironment()
+```
+
+### Access Services
+
+**Option A: Via app instance (recommended - explicit dependency)**
+```swift
+let app = try FirebaseApp.app()
+let firestore = try app.firestore()
+let auth = app.auth()
+let messaging = app.messaging()
+let appCheck = app.appCheck()
+```
+
+**Option B: Via convenience methods (implicit default app)**
 ```swift
 let firestore = try Firestore.firestore()
+let auth = try FirebaseAuth.auth()
+let messaging = try FirebaseMessaging.getMessaging()
+```
+
+### Firestore Operations
+```swift
+let app = try FirebaseApp.initialize(serviceAccount: serviceAccount)
+let firestore = try app.firestore()
+
+// Document operations
 let ref = firestore.collection("users").document("userId")
 try await ref.setData(userData)
 let data = try await ref.getDocument(type: User.self)
+
+// Query operations
+let snapshot = try await firestore.collection("users")
+    .where(field: "age", isGreaterThan: 18)
+    .order(by: "name")
+    .getDocuments()
 ```
 
-**Auth operations:**
+### Auth Operations
 ```swift
-let auth = try FirebaseAuth.auth()
-// Use auth client methods
+let app = try FirebaseApp.app()
+let auth = app.auth()
+
+// Create custom token
+let token = try await auth.createCustomToken(uid: "user123")
+
+// Verify ID token
+let decodedToken = try await auth.verifyIdToken(token)
 ```
 
-**Messaging:**
+### Messaging Operations
 ```swift
-let messaging = try FirebaseMessaging.getMessaging()
-// Send FCM messages
+let app = try FirebaseApp.app()
+let messaging = app.messaging()
+
+// Send message
+try await messaging.send(message: fcmMessage)
 ```
 
-**AppCheck operations:**
+### AppCheck Operations
+
+**Option 1: Via FirebaseApp instance**
 ```swift
-// Initialize with explicit project ID
+let app = try FirebaseApp.app()
+let appCheck = app.appCheck()
+```
+
+**Option 2: With explicit project ID**
+```swift
 let appCheck = AppCheck(projectID: "your-project-id")
+```
 
-// Or initialize from FirebaseApp (uses serviceAccount.projectId)
-let appCheck = try AppCheck()
+**Option 3: From default app (convenience)**
+```swift
+let appCheck = try AppCheck()  // Uses default FirebaseApp
+```
 
-// Verify App Check token from client request
+**Verify tokens:**
+```swift
 let httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
 let token = request.headers["X-Firebase-AppCheck"].first ?? ""
 
@@ -200,6 +275,30 @@ do {
 
 // Clear JWKS cache (forces refresh on next verification)
 await appCheck.clearCache()
+```
+
+### Multiple Projects
+
+**Connecting to multiple Firebase projects:**
+```swift
+// Initialize multiple apps
+let prodApp = try FirebaseApp.initialize(
+    name: "production",
+    serviceAccount: prodAccount
+)
+
+let stagingApp = try FirebaseApp.initialize(
+    name: "staging",
+    serviceAccount: stagingAccount
+)
+
+// Access services from different projects
+let prodFirestore = try prodApp.firestore()
+let stagingFirestore = try stagingApp.firestore()
+
+// Cleanup
+try prodApp.delete()
+try stagingApp.delete()
 ```
 
 ## Important Notes

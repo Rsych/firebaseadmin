@@ -6,10 +6,11 @@
 //
 
 import Foundation
+import Synchronization
 @preconcurrency import JWTKit
 import AsyncHTTPClient
 import NIO
-import FirebaseApp
+@_exported import FirebaseApp
 
 // MARK: - Errors
 
@@ -103,13 +104,18 @@ public actor AppCheck {
         self.projectNumber = projectNumber
     }
 
-    /// Convenience initializer using FirebaseApp's service account
-    /// - Throws: AppCheckError.invalidProjectID if FirebaseApp is not initialized
+    /// Convenience initializer using default FirebaseApp's service account
+    /// - Throws: AppCheckError.invalidProjectID if default FirebaseApp is not initialized
     public init() throws {
-        guard let serviceAccount = FirebaseApp.app.serviceAccount else {
-            throw AppCheckError.invalidProjectID
-        }
-        self.projectID = serviceAccount.projectId
+        let app = try FirebaseApp.app()
+        self.projectID = app.serviceAccount.projectId
+        self.projectNumber = nil
+    }
+
+    /// Initialize with a specific FirebaseApp instance
+    /// - Parameter app: The FirebaseApp instance to use
+    public init(app: FirebaseApp) {
+        self.projectID = app.serviceAccount.projectId
         self.projectNumber = nil
     }
 
@@ -197,5 +203,31 @@ public actor AppCheck {
     /// Clear the JWKS cache (useful for testing or forcing refresh)
     public func clearCache() {
         jwksCache = nil
+    }
+}
+
+// MARK: - FirebaseApp Extension
+
+/**
+ Extension providing AppCheck factory method on FirebaseApp.
+ */
+extension FirebaseApp {
+
+    /**
+     Returns an `AppCheck` instance for this app.
+
+     Use this method to obtain an `AppCheck` instance that is initialized with this app's
+     service account project ID.
+
+     Example:
+     ```swift
+     let app = try FirebaseApp.initialize(serviceAccount: serviceAccount)
+     let appCheck = app.appCheck()
+     ```
+
+     - Returns: An `AppCheck` instance initialized with this app's project ID.
+     */
+    public func appCheck() -> AppCheck {
+        return AppCheck(app: self)
     }
 }
