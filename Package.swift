@@ -28,7 +28,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.21.2"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
-        .package(url: "https://github.com/1amageek/FirebaseAPI.git", from: "1.0.1"),
+        .package(url: "https://github.com/Rsych/FirebaseAPI.git", from: "1.0.2"),
         .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", from: "2.0.0"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.13.4"),
         .package(url: "https://github.com/Flight-School/AnyCodable", from: "0.6.7"),

@@ -276,4 +276,192 @@ struct RangeQueryTests {
             #expect(timestamps[i].seconds >= timestamps[i + 1].seconds)
         }
     }
+
+    @Test func offset() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .offset(2)
+                .getDocuments()
+
+            // Should skip first 2 documents, returning 3
+            #expect(snapshot.documents.count == 3)
+
+            // First result should be item2 (April 14)
+            if let firstTimestamp = snapshot.documents.first?.data()?["startTime"] as? Timestamp {
+                #expect(firstTimestamp == Timestamp(year: 2023, month: 4, day: 14))
+            }
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func offsetWithLimit() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .offset(1)
+                .limit(to: 2)
+                .getDocuments()
+
+            // Should skip first document, then return 2
+            #expect(snapshot.documents.count == 2)
+
+            // Results should be item1 (April 13) and item2 (April 14)
+            let timestamps = snapshot.documents.compactMap { doc -> Timestamp? in
+                doc.data()?["startTime"] as? Timestamp
+            }
+            #expect(timestamps.count == 2)
+            #expect(timestamps[0] == Timestamp(year: 2023, month: 4, day: 13))
+            #expect(timestamps[1] == Timestamp(year: 2023, month: 4, day: 14))
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func startAt() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .start(at: Timestamp(year: 2023, month: 4, day: 14))
+                .getDocuments()
+
+            // Should return items starting at April 14 (inclusive)
+            #expect(snapshot.documents.count == 3)
+
+            // First result should be item2 (April 14)
+            if let firstTimestamp = snapshot.documents.first?.data()?["startTime"] as? Timestamp {
+                #expect(firstTimestamp == Timestamp(year: 2023, month: 4, day: 14))
+            }
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func startAfter() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .start(after: Timestamp(year: 2023, month: 4, day: 14))
+                .getDocuments()
+
+            // Should return items after April 14 (exclusive)
+            #expect(snapshot.documents.count == 2)
+
+            // First result should be item3 (April 15)
+            if let firstTimestamp = snapshot.documents.first?.data()?["startTime"] as? Timestamp {
+                #expect(firstTimestamp == Timestamp(year: 2023, month: 4, day: 15))
+            }
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func endAt() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .end(at: Timestamp(year: 2023, month: 4, day: 14))
+                .getDocuments()
+
+            // Should return items up to and including April 14
+            #expect(snapshot.documents.count == 3)
+
+            // Last result should be item2 (April 14)
+            if let lastTimestamp = snapshot.documents.last?.data()?["startTime"] as? Timestamp {
+                #expect(lastTimestamp == Timestamp(year: 2023, month: 4, day: 14))
+            }
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func endBefore() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .end(before: Timestamp(year: 2023, month: 4, day: 14))
+                .getDocuments()
+
+            // Should return items before April 14 (exclusive)
+            #expect(snapshot.documents.count == 2)
+
+            // Last result should be item1 (April 13)
+            if let lastTimestamp = snapshot.documents.last?.data()?["startTime"] as? Timestamp {
+                #expect(lastTimestamp == Timestamp(year: 2023, month: 4, day: 13))
+            }
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func startAtEndAt() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .start(at: Timestamp(year: 2023, month: 4, day: 13))
+                .end(at: Timestamp(year: 2023, month: 4, day: 15))
+                .getDocuments()
+
+            // Should return items from April 13 to April 15 (inclusive on both ends)
+            #expect(snapshot.documents.count == 3)
+
+            let timestamps = snapshot.documents.compactMap { doc -> Timestamp? in
+                doc.data()?["startTime"] as? Timestamp
+            }
+            #expect(timestamps.count == 3)
+            #expect(timestamps[0] == Timestamp(year: 2023, month: 4, day: 13))
+            #expect(timestamps[1] == Timestamp(year: 2023, month: 4, day: 14))
+            #expect(timestamps[2] == Timestamp(year: 2023, month: 4, day: 15))
+        }
+
+        try await cleanupTestData()
+    }
+
+    @Test func startAfterEndBefore() async throws {
+        try await setupTestData()
+
+        do {
+            let ref = try Firestore.firestore().collection(path)
+            let snapshot = try await ref
+                .order(by: "startTime", descending: false)
+                .start(after: Timestamp(year: 2023, month: 4, day: 12))
+                .end(before: Timestamp(year: 2023, month: 4, day: 16))
+                .getDocuments()
+
+            // Should return items after April 12 and before April 16 (exclusive on both ends)
+            #expect(snapshot.documents.count == 3)
+
+            let timestamps = snapshot.documents.compactMap { doc -> Timestamp? in
+                doc.data()?["startTime"] as? Timestamp
+            }
+            #expect(timestamps.count == 3)
+            #expect(timestamps[0] == Timestamp(year: 2023, month: 4, day: 13))
+            #expect(timestamps[1] == Timestamp(year: 2023, month: 4, day: 14))
+            #expect(timestamps[2] == Timestamp(year: 2023, month: 4, day: 15))
+        }
+
+        try await cleanupTestData()
+    }
 }
