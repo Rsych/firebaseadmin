@@ -214,6 +214,55 @@ let snapshot = try await firestore.collection("users")
     .getDocuments()
 ```
 
+#### Query Pagination
+
+**Offset-based pagination:**
+```swift
+// Skip first 20 results, return next 10
+let page3 = try await firestore.collection("users")
+    .order(by: "createdAt")
+    .offset(20)
+    .limit(to: 10)
+    .getDocuments()
+```
+
+**Cursor-based pagination (recommended for large datasets):**
+```swift
+// Start at a specific value (inclusive)
+let snapshot = try await firestore.collection("users")
+    .order(by: "score")
+    .start(at: 100)
+    .getDocuments()
+
+// Start after a specific value (exclusive) - useful for "next page"
+let nextPage = try await firestore.collection("users")
+    .order(by: "createdAt")
+    .start(after: lastDocument.data()["createdAt"]!)
+    .limit(to: 10)
+    .getDocuments()
+
+// End at a specific value (inclusive)
+let snapshot = try await firestore.collection("users")
+    .order(by: "score")
+    .end(at: 500)
+    .getDocuments()
+
+// End before a specific value (exclusive)
+let snapshot = try await firestore.collection("users")
+    .order(by: "score")
+    .end(before: 500)
+    .getDocuments()
+
+// Range query with cursors
+let midRange = try await firestore.collection("scores")
+    .order(by: "value")
+    .start(at: 50)
+    .end(at: 100)
+    .getDocuments()
+```
+
+**Note:** Cursor values must match the order of `order(by:)` fields in the query.
+
 ### Auth Operations
 ```swift
 let app = try FirebaseApp.app()
